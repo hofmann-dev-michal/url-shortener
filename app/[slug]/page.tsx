@@ -7,15 +7,16 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default async function RedirectPage({ params }: { params: { slug: string } }) {
-  const { data } = await supabase
-    .from('tab_zkracovace')
-    .select('cilova_url')
-    .eq('zkratka', params.slug)
-    .single()
+  const { data, error } = await supabase
+  .from('tab_zkracovace')
+  .select('*')
+  .eq('zkratka', params.slug)
 
-  if (data?.cilova_url) {
-    redirect(data.cilova_url)
-  }
+  console.log("SLUG:", params.slug)
+  console.log("DATA:", data)
+  console.log("ERROR:", error)
+
+  
 
   return (
     <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
