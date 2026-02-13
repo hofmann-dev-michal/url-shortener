@@ -1,79 +1,88 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+// Propojení přímo zde - žádné složité importy
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function Home() {
-  const [slug, setSlug] = useState('');
-  const [url, setUrl] = useState('');
-  const [status, setStatus] = useState('');
+  const [url, setUrl] = useState('')
+  const [slug, setSlug] = useState('')
+  const [message, setMessage] = useState('')
+  const [user, setUser] = useState<any>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
-  const handleSave = async () => {
-    // 1. KONTROLA: Reaguje tlačítko?
-    console.log('Tlačítko stisknuto');
-    setStatus('Zkouším se spojit s databází...');
-
-    if (!slug || !url) {
-      alert('Vyplň obě políčka!');
-      return;
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
     }
+    checkUser()
+  }, [])
 
-    try {
-      const { data, error } = await supabase
-        .from('links')
-        .insert([{ slug, url }])
-        .select();
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setMessage('Chyba: ' + error.message)
+    else window.location.reload()
+  }
 
-      // 2. KONTROLA: Co odpovědělo Supabase?
-      if (error) {
-        console.error('Chyba ze Supabase:', error);
-        setStatus('Chyba: ' + error.message);
-        alert('Chyba z databáze: ' + error.message);
-      } else {
-        console.log('Úspěch:', data);
-        setStatus('✅ Uloženo do databáze!');
-        alert('Hurá! Uloženo.');
-        setSlug('');
-        setUrl('');
-      }
-    } catch (err) {
-      console.error('Totální selhání:', err);
-      alert('Něco se rozbilo v kódu, koukni do konzole (F12)');
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.reload()
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage('Pracuji na tom...')
+
+    const { error } = await supabase
+      .from('tab_zkracovace') // Tvůj nový název
+      .insert([{ 
+        cilova_url: url,      // Tvůj nový název
+        zkratka: slug         // Tvůj nový název
+      }])
+
+    if (error) {
+      setMessage('Chyba: ' + error.message)
+    } else {
+      setMessage(`Hotovo! Odkaz je: click.hofmann-personal.cz/${slug}`)
+      setUrl('')
+      setSlug('')
     }
-  };
+  }
+
+  if (!user) {
+    return (
+      <main style={{ padding: '50px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <h1>Hofmann - Přihlášení</h1>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '300px', margin: '0 auto' }}>
+          <input type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Heslo" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <button type="submit">Vstoupit</button>
+        </form>
+        {message && <p>{message}</p>}
+      </main>
+    )
+  }
 
   return (
-    <main style={{ padding: '50px', fontFamily: 'sans-serif', maxWidth: '500px', margin: '0 auto' }}>
-      <h1 style={{ color: '#003056' }}>Hofmann URL Shortener</h1>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
-        <input 
-          type="text" 
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="Zkratka (např. google)" 
-          style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc', color: 'black' }} 
-        />
-        <input 
-          type="text" 
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Cílová URL (https://...)" 
-          style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc', color: 'black' }} 
-        />
-        <button 
-          onClick={handleSave}
-          style={{ padding: '12px', backgroundColor: '#003056', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          Uložit do databáze
-        </button>
-        <p style={{ marginTop: '10px', fontWeight: 'bold' }}>{status}</p>
+    <main style={{ padding: '50px', fontFamily: 'sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <h1>Hofmann Zkracovač</h1>
+        <button onClick={handleLogout}>Odhlásit se ({user.email})</button>
       </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px', marginTop: '30px' }}>
+        <input type="url" placeholder="Dlouhá URL" value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <input type="text" placeholder="Zkratka" value={slug} onChange={(e) => setSlug(e.target.value)} required />
+        <button type="submit">Vytvořit</button>
+      </form>
+      {message && <p>{message}</p>}
     </main>
-  );
+  )
 }
