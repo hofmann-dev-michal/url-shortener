@@ -1,3 +1,4 @@
+console.log("SUPABASE URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
 import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 
