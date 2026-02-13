@@ -1,4 +1,4 @@
-console.log("SUPABASE URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 
