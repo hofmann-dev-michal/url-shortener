@@ -1,27 +1,35 @@
 export const dynamic = 'force-dynamic'
+
 import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-export default async function RedirectPage({ params }: { params: { slug: string } }) {
+export default async function RedirectPage(props: any) {
+  const params = await props.params
+  const slug = params?.slug
+
+  console.log("SLUG:", slug)
+
+  if (!slug) {
+    return <h1>Slug není předán</h1>
+  }
+
   const { data, error } = await supabase
-  .from('tab_zkracovace')
-  .select('*')
-  .eq('zkratka', params.slug)
+    .from('tab_zkracovace')
+    .select('cilova_url')
+    .eq('zkratka', slug)
+    .single()
 
-  console.log("SLUG:", params.slug)
   console.log("DATA:", data)
   console.log("ERROR:", error)
 
-  
+  if (data?.cilova_url) {
+    redirect(data.cilova_url)
+  }
 
-  return (
-    <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>
-      <h1>404 - Nenalezeno</h1>
-      <p>Zkratka <strong>{params.slug}</strong> neexistuje.</p>
-    </div>
-  )
+  return <h1>404 – Nenalezeno</h1>
 }
