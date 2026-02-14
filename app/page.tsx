@@ -2,32 +2,187 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { LogOut, Link as LinkIcon } from "lucide-react"
+import Image from "next/image"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+
+/* ================= LOGIN ================= */
+
+function LoginForm({
+  email,
+  setEmail,
+  password,
+  setPassword
+}: any) {
+
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginLoading(true)
+    setLoginError('')
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    setLoginLoading(false)
+
+    if (error) {
+      setLoginError('Neplatný e-mail nebo heslo.')
+      return
+    }
+
+    window.location.reload()
+  }
+
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-10 border border-slate-200">
+
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
+            Hofmann Link
+          </h1>
+          <p className="text-sm text-slate-500 mt-2">
+            Interní správa zkratek
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleLoginSubmit}
+          className="space-y-5"
+        >
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">
+              E-mail
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0d73a1] focus:border-transparent transition"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">
+              Heslo
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0d73a1] focus:border-transparent transition"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loginLoading}
+            className={`w-full rounded-xl py-3 text-sm font-semibold text-white transition-all duration-200
+              ${loginLoading
+                ? "bg-slate-400 cursor-not-allowed"
+                : "bg-[#0d73a1] hover:bg-[#0a5c80] active:scale-[0.98] shadow-md hover:shadow-lg"}
+            `}
+          >
+            {loginLoading ? "Přihlašuji..." : "Přihlásit se"}
+          </button>
+
+        </form>
+
+        {loginError && (
+          <div className="mt-5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3">
+            {loginError}
+          </div>
+        )}
+
+      </div>
+
+    </main>
+  )
+}
+
+/* ================= DASHBOARD ================= */
+
 export default function Home() {
+
   const [url, setUrl] = useState('')
   const [slug, setSlug] = useState('')
-  const [message, setMessage] = useState('')
   const [user, setUser] = useState<any>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [links, setLinks] = useState<any[]>([])
+  const [createdLink, setCreatedLink] = useState('')
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+      if (user) fetchLinks()
     }
     checkUser()
   }, [])
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const fetchLinks = async () => {
+    const { data } = await supabase
+      .from('tab_zkracovace')
+      .select('*')
+      .order('id', { ascending: false })
+
+    if (data) setLinks(data)
+  }
+
+  const generateRandomSlug = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let result = ''
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setSlug(result)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setMessage('Chyba: ' + error.message)
-    else window.location.reload()
+
+    const { error } = await supabase
+      .from('tab_zkracovace')
+      .insert([{
+  cilova_url: url,
+  zkratka: slug,
+  vytvoril: user.email
+}])
+
+    if (error) {
+      alert('Zkratka už existuje.')
+      return
+    }
+
+    const finalUrl = `${baseUrl}/${slug}`
+
+    setCreatedLink(finalUrl)
+    setCopied(false)
+    setUrl('')
+    setSlug('')
+    fetchLinks()
+  }
+
+  const handleDelete = async (id: number) => {
+    await supabase.from('tab_zkracovace').delete().eq('id', id)
+    fetchLinks()
   }
 
   const handleLogout = async () => {
@@ -35,100 +190,183 @@ export default function Home() {
     window.location.reload()
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMessage('Generuji odkaz...')
-
-    const { error } = await supabase
-      .from('tab_zkracovace')
-      .insert([{ cilova_url: url, zkratka: slug }])
-
-    if (error) {
-      setMessage('Chyba: ' + error.message)
-    } else {
-      setMessage(`✅ Hotovo! click.hofmann-personal.cz/${slug}`)
-      setUrl('')
-      setSlug('')
-    }
-  }
-
-  // --- STYLY ---
-  const colors = {
-    primary: '#004a99', // Hofmann modrá (uprav si podle potřeby)
-    secondary: '#f2f2f2',
-    text: '#333',
-    white: '#ffffff'
-  }
-
   if (!user) {
     return (
-      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondary, fontFamily: 'sans-serif' }}>
-        <div style={{ backgroundColor: colors.white, padding: '40px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', width: '100%', maxWidth: '350px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-             <h2 style={{ color: colors.primary, margin: 0 }}>HOFMANN</h2>
-             <p style={{ color: '#666', fontSize: '14px' }}>Interní zkracovač odkazů</p>
-          </div>
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <input type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} required 
-                   style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ddd' }} />
-            <input type="password" placeholder="Heslo" value={password} onChange={(e) => setPassword(e.target.value)} required 
-                   style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ddd' }} />
-            <button type="submit" style={{ padding: '12px', backgroundColor: colors.primary, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-              Přihlásit se
-            </button>
-          </form>
-          {message && <p style={{ color: 'red', fontSize: '13px', textAlign: 'center', marginTop: '15px' }}>{message}</p>}
-        </div>
-      </main>
+      <LoginForm
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+      />
     )
   }
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: colors.secondary, fontFamily: 'sans-serif' }}>
-      {/* Header */}
-      <nav style={{ backgroundColor: colors.primary, color: 'white', padding: '15px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, letterSpacing: '1px' }}>HOFMANN</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ fontSize: '14px', opacity: 0.9 }}>{user.email}</span>
-          <button onClick={handleLogout} style={{ backgroundColor: 'transparent', border: '1px solid white', color: 'white', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-            Odhlásit
-          </button>
-        </div>
-      </nav>
+    <main className="min-h-screen bg-slate-100">
 
-      {/* Content */}
-      <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
-        <div style={{ backgroundColor: colors.white, padding: '30px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', width: '100%', maxWidth: '500px' }}>
-          <h3 style={{ marginTop: 0, color: colors.primary }}>Vytvořit novou zkratku</h3>
-          
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>Cílová URL adresa</label>
-              <input type="url" placeholder="https://vlozte-dlouhy-odkaz.cz" value={url} onChange={(e) => setUrl(e.target.value)} required 
-                     style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>Vlastní zkratka</label>
-              <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f9f9f9', border: '1px solid #ddd', borderRadius: '6px', paddingLeft: '12px' }}>
-                <span style={{ color: '#888', fontSize: '14px' }}>click.h-p.cz/</span>
-                <input type="text" placeholder="akce2024" value={slug} onChange={(e) => setSlug(e.target.value)} required 
-                       style={{ flex: 1, padding: '12px', border: 'none', background: 'transparent', outline: 'none' }} />
+      {/* HEADER */}
+      <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shadow-sm">
+
+  <div className="flex items-center gap-3">
+  <Image
+    src="/logo.png"
+    alt="Hofmann Link"
+    width={42}
+    height={42}
+    priority
+  />
+  <h1 className="text-xl font-semibold tracking-tight text-slate-800">
+    Hofmann Link
+  </h1>
+</div>
+
+  <div className="flex items-center gap-4">
+    <span className="text-sm text-slate-500">
+      {user.email}
+    </span>
+    <button
+  onClick={handleLogout}
+  className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition"
+>
+  <LogOut size={16} />
+  Odhlásit
+</button>
+  </div>
+
+</header>
+
+      <div className="max-w-4xl mx-auto px-8 py-12 space-y-12">
+
+        {/* CREATE FORM */}
+        <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-8">
+          <h2 className="text-lg font-semibold text-slate-800 mb-6">
+            Vytvořit novou zkratku
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+
+            <input
+              type="url"
+              placeholder="https://dlouhy-odkaz.cz"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0d73a1]"
+            />
+
+            <div className="flex gap-2">
+              <div className="flex flex-1 items-center border border-slate-300 rounded-xl px-4 py-3 text-sm bg-slate-50">
+                <span className="text-slate-500 mr-1">{baseUrl}/</span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  required
+                  className="flex-1 bg-transparent outline-none"
+                />
               </div>
+
+              <button
+                type="button"
+                onClick={generateRandomSlug}
+                className="px-4 rounded-xl bg-slate-800 text-white text-sm hover:bg-black transition"
+              >
+                Generovat
+              </button>
             </div>
 
-            <button type="submit" style={{ padding: '15px', backgroundColor: colors.primary, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', marginTop: '10px' }}>
-              Vytvořit a uložit
+            <button
+              type="submit"
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white bg-[#0d73a1] hover:bg-[#0a5c80] active:scale-[0.98] transition-all"
+            >
+              Vytvořit
             </button>
+
           </form>
 
-          {message && (
-            <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '6px', textAlign: 'center', color: '#0050b3', fontWeight: 'bold' }}>
-              {message}
+          {createdLink && (
+            <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="text-sm font-medium mb-3">
+                {createdLink}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdLink)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition
+                    ${copied ? "bg-green-600" : "bg-[#0d73a1] hover:bg-[#0a5c80]"}
+                  `}
+                >
+                  {copied ? "Zkopírováno ✓" : "Kopírovat"}
+                </button>
+
+                <a
+                  href={createdLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm hover:bg-black transition"
+                >
+                  Otevřít
+                </a>
+              </div>
             </div>
           )}
         </div>
+
+        {/* HISTORY */}
+        <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-8">
+          <h2 className="text-lg font-semibold text-slate-800 mb-6">
+            Historie zkratek
+          </h2>
+
+          <div className="divide-y divide-slate-200">
+            {links.map((item) => (
+  <div key={item.id} className="py-4 flex justify-between items-start">
+    <div>
+      <div className="font-medium text-slate-800">
+        {baseUrl}/{item.zkratka}
       </div>
+
+      <div className="text-sm text-slate-500">
+        {item.cilova_url}
+      </div>
+
+      <div className="text-xs text-slate-400 mt-2 space-y-1">
+        <div>
+          Kliků: {item.pocet_kliku || 0}
+        </div>
+
+        {item.posledni_klik && (
+          <div>
+            Poslední klik: {new Date(item.posledni_klik).toLocaleString()}
+          </div>
+        )}
+
+        <div>
+          Vytvořil: {item.vytvoril}
+        </div>
+      </div>
+    </div>
+
+    <button
+      onClick={() => handleDelete(item.id)}
+      className="text-sm text-red-500 hover:text-red-700 transition"
+    >
+      Smazat
+    </button>
+  </div>
+))}
+
+          </div>
+
+        </div>
+
+      </div>
+
     </main>
   )
 }

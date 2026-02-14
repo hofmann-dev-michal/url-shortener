@@ -1,35 +1,32 @@
-export const dynamic = 'force-dynamic'
-
 import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+export default async function SlugPage(props: { params: Promise<{ slug: string }> }) {
 
-export default async function RedirectPage(props: any) {
-  const params = await props.params
-  const slug = params?.slug
+  const { slug } = await props.params
 
-  console.log("SLUG:", slug)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 
-  if (!slug) {
-    return <h1>Slug není předán</h1>
-  }
-
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('tab_zkracovace')
-    .select('cilova_url')
+    .select('*')
     .eq('zkratka', slug)
     .single()
 
-  console.log("DATA:", data)
-  console.log("ERROR:", error)
-
-  if (data?.cilova_url) {
-    redirect(data.cilova_url)
+  if (!data) {
+    return <div style={{ padding: 40 }}>Odkaz nenalezen</div>
   }
 
-  return <h1>404 – Nenalezeno</h1>
+  await supabase
+    .from('tab_zkracovace')
+    .update({
+      pocet_kliku: (data.pocet_kliku || 0) + 1,
+      posledni_klik: new Date().toISOString()
+    })
+    .eq('id', data.id)
+
+  redirect(data.cilova_url)
 }
