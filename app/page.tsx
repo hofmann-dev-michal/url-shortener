@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { LogOut, Link as LinkIcon } from "lucide-react"
+import { LogOut, Copy, Check } from "lucide-react"
 import Image from "next/image"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -127,6 +127,7 @@ export default function Home() {
   const [links, setLinks] = useState<any[]>([])
   const [createdLink, setCreatedLink] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copiedId, setCopiedId] = useState<number | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -255,16 +256,23 @@ export default function Home() {
             />
 
             <div className="flex gap-2">
-              <div className="flex flex-1 items-center border border-slate-300 rounded-xl px-4 py-3 text-sm bg-slate-50">
-                <span className="text-slate-500 mr-1">{baseUrl}/</span>
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  required
-                  className="flex-1 bg-transparent outline-none"
-                />
-              </div>
+              <div className="flex items-stretch flex-1">
+
+  <div className="flex items-center px-4 rounded-l-xl bg-slate-100 border border-r-0 border-slate-300 text-slate-500 text-sm select-none">
+    {baseUrl}/
+  </div>
+
+  <input
+    type="text"
+    value={slug}
+    onChange={(e) => setSlug(e.target.value)}
+    required
+    className="flex-1 border border-slate-300 rounded-r-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0d73a1] focus:border-transparent"
+    placeholder="moje-zkratka"
+  />
+
+</div>
+
 
               <button
                 type="button"
@@ -352,12 +360,41 @@ export default function Home() {
       </div>
     </div>
 
-    <button
-      onClick={() => handleDelete(item.id)}
-      className="text-sm text-red-500 hover:text-red-700 transition"
-    >
-      Smazat
-    </button>
+    <div className="flex flex-col items-end gap-2">
+  <button
+  onClick={() => {
+    const fullUrl = `${baseUrl}/${item.zkratka}`
+    navigator.clipboard.writeText(fullUrl)
+    setCopiedId(item.id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }}
+  className={`flex items-center gap-2 text-sm font-medium transition
+    ${copiedId === item.id
+      ? "text-green-600"
+      : "text-[#0d73a1] hover:text-[#0a5c80]"}
+  `}
+>
+  {copiedId === item.id ? (
+    <>
+      <Check size={16} />
+      Zkopírováno
+    </>
+  ) : (
+    <>
+      <Copy size={16} />
+      Kopírovat
+    </>
+  )}
+</button>
+
+
+  <button
+    onClick={() => handleDelete(item.id)}
+    className="text-sm text-red-500 hover:text-red-700 transition"
+  >
+    Smazat
+  </button>
+</div>
   </div>
 ))}
 
